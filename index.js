@@ -1,16 +1,17 @@
 const bigBang = Date.now();
 // Dependancies
-const twconf = require('../twitchconfig.json');
+const twconf = require('../auths/twitch/mike_the_madkiwi.json');
 const tmi = require('tmi.js');
 const colors = require('colors');
 const ws = require('ws');
+const fetchUrl = require("fetch").fetchUrl
 // STORE VALS
 let CLIENTS = [];
 let ROOMSTATE;
 const channelUsers = [];
 // SQL
 const mysql = require('mysql');
-const sqlconfig = require('../dbconfig.json'); 
+const sqlconfig = require('../auths/sql/dbconfig.json'); 
 const sqlConn = mysql.createConnection(sqlconfig);
 sqlConn.on('error', function(err) {
     console.log('SQLERR', err.code)
@@ -40,24 +41,20 @@ class AuthLib {
         // `https://id.twitch.tv/oauth2/authorize?client_id=${twconf.identity.clientID}&redirect_uri=http://127.0.0.1:8000&response_type=token`
     }
     fetchUser(){
-        fetch(
-            'https://api.twitch.tv/helix/users',
-            {
-                "headers": {
-                    "Client-ID": client_id,
-                    "Authorization": "Bearer " + access_token
+        return new Promise((resolve, reject) => { 
+            let fetchu = fetchUrl(
+                'https://api.twitch.tv/helix/users',
+                {
+                    "headers": {
+                        "Client-ID": twconf.oauth.clientId,
+                        "Authorization": "Bearer " + twconf.identity.password
+                    }
+                },function(error, meta, body){
+                    let bs = JSON.parse(body);
+                    resolve(bs)
                 }
-            }
-        )
-        .then(resp => resp.json())
-        .then(resp => {
-           resp.forEach(element => {
-               console.log(element)               
-           });
+            )
         })
-        .catch(err => {
-            console.log(err);
-        });
     }
 }
 // PingLib
@@ -107,8 +104,10 @@ class TwitchChatLib {
         }
         else{        
             if(msg.substr(0, 1) == "!"){
+                let _Auth = new AuthLib; 
                 console.log(`command`, msg)
-                CLIENTS['twitchchat'].say(target, `Kiwi has BDE`);
+                // CLIENTS['twitchchat'].say(target, `Kiwi has BDE`);
+                await _Auth.fetchUser();
             }
             else {
                 let pre = `[${context['user-id']}]`.magenta;
@@ -125,7 +124,7 @@ class TwitchChatLib {
     async onUserJoin(channel, username, self) {
         if(self){console.log(`Connected to : [${channel}]`)}
         else{
-            console.log(`${channel} ChatUsers[${channelUsers.length}] ${username} Joined`)
+            console.log(`${channel} ChatUsers[${channelUsers.length}] ${username} Joined`.green)
         }
         let Fu = channelUsers.map(function(user) { return user; }).indexOf(username);
         if(Fu==-1){
@@ -136,7 +135,7 @@ class TwitchChatLib {
         if(self){console.log(`selfpart`)}
         let Fu = channelUsers.map(function(user) { return user; }).indexOf(username);
         channelUsers.splice(Fu, 1);
-        console.log(`${channel}  ChatUsers[${channelUsers.length}] ${username} parted`)
+        console.log(`${channel}  ChatUsers[${channelUsers.length}] ${username} parted`.red)
     }
     async onReconnect(){console.log(`reconnected`)}
     async onClearChat(chan, user){
